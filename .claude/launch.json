@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3001,
+      "autoPort": true
+    },
+    {
+      "name": "prisma-studio",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["prisma", "studio", "--schema", "apps/web/prisma/schema.prisma"],
+      "port": 5555,
+      "autoPort": true
+    }
+  ]
+}
