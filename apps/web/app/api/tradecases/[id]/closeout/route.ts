@@ -6,6 +6,7 @@ import { apiSuccess } from '@/lib/api/response'
 import { Errors } from '@/lib/api/errors'
 import { logAudit } from '@/lib/audit'
 import { createNotification } from '@/lib/notifications'
+import { generateCloseoutZip } from '@/lib/closeout/generate'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -72,14 +73,24 @@ export const POST = apiHandler(async (req: NextRequest, ctx?: RouteContext) => {
     )
   }
 
+  // Generate the actual ZIP file
+  let zipResult: { fileKey: string; documentCount: number };
+  try {
+    zipResult = await generateCloseoutZip(id);
+  } catch (err) {
+    console.error('[CLOSEOUT_ZIP_FAILED]', { tradeCaseId: id, error: err });
+    throw Errors.internal('Failed to generate close-out ZIP. Please retry.');
+  }
+
   // Create closeout pack and mark case completed in a transaction
   const result = await prisma.$transaction(async (tx) => {
     const closeoutPack = await tx.closeoutPack.create({
       data: {
         tradeCaseId: id,
         status: 'READY',
+        fileKey: zipResult.fileKey,
         generatedByUserId: auth.user.id,
-        notes: `Close-out pack generated with ${requiredDocs.length} approved documents.`,
+        notes: `Close-out pack generated with ${zipResult.documentCount} approved documents packaged into ZIP.`,
       },
     })
 
