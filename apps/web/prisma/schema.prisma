@@ -27,14 +27,14 @@ enum MembershipStatus {
   DISABLED
 }
 
-enum OrgVerificationStatus {
+enum OrganizationVerificationStatus {
   UNVERIFIED
   PENDING
   VERIFIED
   REJECTED
 }
 
-enum OrgVerificationLevel {
+enum OrganizationVerificationLevel {
   NONE
   BASIC
   ENHANCED
@@ -93,7 +93,7 @@ enum DocumentType {
   OTHER
 }
 
-enum ReviewAction {
+enum DocumentReviewAction {
   APPROVED
   REJECTED
 }
@@ -204,7 +204,7 @@ model VerificationToken {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CORE MODELS
+// IDENTITY / ACCESS
 // ═══════════════════════════════════════════════════════════════
 
 model User {
@@ -212,8 +212,9 @@ model User {
   name          String?
   email         String    @unique
   emailVerified DateTime? @map("email_verified")
-  image         String?
-  createdAt     DateTime  @default(now()) @map("created_at")
+  image          String?
+  hashedPassword String?   @map("hashed_password")
+  createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   // Auth.js relations
@@ -223,6 +224,7 @@ model User {
   // App relations
   memberships        Membership[]
   createdRfqs        Rfq[]             @relation("RfqCreatedBy")
+  rfqAttachments     RfqAttachment[]   @relation("RfqAttachmentUploadedBy")
   createdQuotes      Quote[]           @relation("QuoteCreatedBy")
   assignedTradeCases TradeCase[]       @relation("TradeCaseAssignedOps")
   createdLots        Lot[]             @relation("LotCreatedBy")
@@ -242,27 +244,27 @@ model User {
 }
 
 model Organization {
-  id                 String                @id @default(cuid())
+  id                 String                         @id @default(cuid())
   name               String
-  slug               String                @unique
+  slug               String                         @unique
   country            String
-  registrationNumber String?               @map("registration_number")
+  registrationNumber String?                        @map("registration_number")
   type               String
-  verificationStatus OrgVerificationStatus @default(UNVERIFIED) @map("verification_status")
-  verificationLevel  OrgVerificationLevel  @default(NONE) @map("verification_level")
-  createdAt          DateTime              @default(now()) @map("created_at")
-  updatedAt          DateTime              @updatedAt @map("updated_at")
+  verificationStatus OrganizationVerificationStatus @default(UNVERIFIED) @map("verification_status")
+  verificationLevel  OrganizationVerificationLevel  @default(NONE) @map("verification_level")
+  createdAt          DateTime                       @default(now()) @map("created_at")
+  updatedAt          DateTime                       @updatedAt @map("updated_at")
 
   // Relations
-  memberships        Membership[]
-  rfqs               Rfq[]            @relation("RfqBuyerOrg")
-  lots               Lot[]            @relation("LotSupplierOrg")
-  lotAllocations     LotAllocation[]  @relation("LotAllocationSupplierOrg")
-  buyerTradeCases    TradeCase[]      @relation("TradeCaseBuyerOrg")
-  uploadedDocuments  Document[]       @relation("DocumentUploadedByOrg")
-  notifications      Notification[]   @relation("NotificationOrg")
-  auditEvents        AuditEvent[]     @relation("AuditEventActorOrg")
-  aiRuns             AiRun[]          @relation("AiRunOrg")
+  memberships       Membership[]
+  rfqs              Rfq[]            @relation("RfqBuyerOrg")
+  lots              Lot[]            @relation("LotSupplierOrg")
+  lotAllocations    LotAllocation[]  @relation("LotAllocationSupplierOrg")
+  buyerTradeCases   TradeCase[]      @relation("TradeCaseBuyerOrg")
+  uploadedDocuments Document[]       @relation("DocumentUploadedByOrg")
+  notifications     Notification[]   @relation("NotificationOrg")
+  auditEvents       AuditEvent[]     @relation("AuditEventActorOrg")
+  aiRuns            AiRun[]          @relation("AiRunOrg")
 
   @@map("organizations")
 }
@@ -285,24 +287,24 @@ model Membership {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RFQ & QUOTING
+// COMMERCIAL INTAKE — RFQ & QUOTING
 // ═══════════════════════════════════════════════════════════════
 
 model Rfq {
-  id                   String    @id @default(cuid())
-  buyerOrganizationId  String    @map("buyer_organization_id")
-  createdByUserId      String    @map("created_by_user_id")
-  status               RfqStatus @default(DRAFT)
-  commodity            String
-  volume               Float
-  unit                 String
-  destination          String
-  incoterm             String?
-  timeline             String?
-  notes                String?   @db.Text
-  aiSummary            String?   @map("ai_summary") @db.Text
-  createdAt            DateTime  @default(now()) @map("created_at")
-  updatedAt            DateTime  @updatedAt @map("updated_at")
+  id                  String    @id @default(cuid())
+  buyerOrganizationId String    @map("buyer_organization_id")
+  createdByUserId     String    @map("created_by_user_id")
+  status              RfqStatus @default(DRAFT)
+  commodity           String
+  volume              Float
+  unit                String
+  destination         String
+  incoterm            String?
+  timeline            String?
+  notes               String?   @db.Text
+  aiSummary           String?   @map("ai_summary") @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   buyerOrganization Organization    @relation("RfqBuyerOrg", fields: [buyerOrganizationId], references: [id])
   createdBy         User            @relation("RfqCreatedBy", fields: [createdByUserId], references: [id])
@@ -314,6 +316,7 @@ model Rfq {
   aiRuns            AiRun[]         @relation("AiRunRfq")
 
   @@index([buyerOrganizationId, status, createdAt])
+  @@index([createdByUserId, createdAt])
   @@map("rfqs")
 }
 
@@ -327,7 +330,8 @@ model RfqAttachment {
   uploadedByUserId String   @map("uploaded_by_user_id")
   createdAt        DateTime @default(now()) @map("created_at")
 
-  rfq Rfq @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  rfq        Rfq  @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation("RfqAttachmentUploadedBy", fields: [uploadedByUserId], references: [id])
 
   @@map("rfq_attachments")
 }
@@ -359,7 +363,7 @@ model Quote {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TRADE CASE
+// EXECUTION — TRADE CASE
 // ═══════════════════════════════════════════════════════════════
 
 model TradeCase {
@@ -393,12 +397,12 @@ model TradeCase {
   aiRuns            AiRun[]        @relation("AiRunTradeCase")
 
   @@index([buyerOrganizationId, status, createdAt])
-  @@index([assignedOpsUserId, status])
+  @@index([assignedOpsUserId, status, updatedAt])
   @@map("trade_cases")
 }
 
 // ═══════════════════════════════════════════════════════════════
-// LOTS & ALLOCATIONS
+// EXECUTION — LOTS & ALLOCATIONS
 // ═══════════════════════════════════════════════════════════════
 
 model Lot {
@@ -434,16 +438,17 @@ model LotAllocation {
   notes                  String?  @db.Text
   createdAt              DateTime @default(now()) @map("created_at")
 
-  tradeCase            TradeCase    @relation(fields: [tradeCaseId], references: [id])
+  tradeCase            TradeCase    @relation(fields: [tradeCaseId], references: [id], onDelete: Cascade)
   lot                  Lot          @relation(fields: [lotId], references: [id])
   supplierOrganization Organization @relation("LotAllocationSupplierOrg", fields: [supplierOrganizationId], references: [id])
 
   @@unique([tradeCaseId, lotId])
+  @@index([supplierOrganizationId])
   @@map("lot_allocations")
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MILESTONES
+// EXECUTION — MILESTONES
 // ═══════════════════════════════════════════════════════════════
 
 model Milestone {
@@ -460,7 +465,7 @@ model Milestone {
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
-  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id])
+  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id], onDelete: Cascade)
   owner     User?     @relation("MilestoneOwner", fields: [ownerUserId], references: [id])
 
   @@unique([tradeCaseId, sequence])
@@ -469,7 +474,7 @@ model Milestone {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DOCUMENTS & REVIEWS
+// EVIDENCE / COMPLIANCE — DOCUMENTS & REVIEWS
 // ═══════════════════════════════════════════════════════════════
 
 model Document {
@@ -489,7 +494,7 @@ model Document {
   createdAt                DateTime       @default(now()) @map("created_at")
   updatedAt                DateTime       @updatedAt @map("updated_at")
 
-  tradeCase              TradeCase        @relation(fields: [tradeCaseId], references: [id])
+  tradeCase              TradeCase        @relation(fields: [tradeCaseId], references: [id], onDelete: Cascade)
   uploadedBy             User?            @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id])
   uploadedByOrganization Organization?    @relation("DocumentUploadedByOrg", fields: [uploadedByOrganizationId], references: [id])
   reviews                DocumentReview[]
@@ -500,12 +505,12 @@ model Document {
 }
 
 model DocumentReview {
-  id               String       @id @default(cuid())
-  documentId       String       @map("document_id")
-  reviewedByUserId String       @map("reviewed_by_user_id")
-  action           ReviewAction
-  reason           String?      @db.Text
-  createdAt        DateTime     @default(now()) @map("created_at")
+  id               String               @id @default(cuid())
+  documentId       String               @map("document_id")
+  reviewedByUserId String               @map("reviewed_by_user_id")
+  action           DocumentReviewAction
+  reason           String?              @db.Text
+  createdAt        DateTime             @default(now()) @map("created_at")
 
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   reviewedBy User     @relation("DocumentReviewedBy", fields: [reviewedByUserId], references: [id])
@@ -515,33 +520,34 @@ model DocumentReview {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// INSPECTIONS
+// EVIDENCE / COMPLIANCE — INSPECTIONS
 // ═══════════════════════════════════════════════════════════════
 
 model Inspection {
-  id              String           @id @default(cuid())
-  tradeCaseId     String           @map("trade_case_id")
-  lotId           String?          @map("lot_id")
+  id              String            @id @default(cuid())
+  tradeCaseId     String            @map("trade_case_id")
+  lotId           String?           @map("lot_id")
   provider        String
-  scheduledAt     DateTime?        @map("scheduled_at")
-  completedAt     DateTime?        @map("completed_at")
-  result          InspectionResult
-  notes           String?          @db.Text
-  attachmentsJson Json?            @map("attachments_json")
-  createdByUserId String           @map("created_by_user_id")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  scheduledAt     DateTime?         @map("scheduled_at")
+  completedAt     DateTime?         @map("completed_at")
+  result          InspectionResult?
+  notes           String?           @db.Text
+  attachmentsJson Json?             @map("attachments_json")
+  createdByUserId String            @map("created_by_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
 
-  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id])
+  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id], onDelete: Cascade)
   lot       Lot?      @relation(fields: [lotId], references: [id])
   createdBy User      @relation("InspectionCreatedBy", fields: [createdByUserId], references: [id])
 
   @@index([tradeCaseId, completedAt])
+  @@index([result, completedAt])
   @@map("inspections")
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ISSUES
+// EXECUTION — ISSUES
 // ═══════════════════════════════════════════════════════════════
 
 model Issue {
@@ -558,16 +564,17 @@ model Issue {
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
-  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id])
+  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id], onDelete: Cascade)
   owner     User?     @relation("IssueOwner", fields: [ownerUserId], references: [id])
   createdBy User      @relation("IssueCreatedBy", fields: [createdByUserId], references: [id])
 
   @@index([tradeCaseId, status, createdAt])
+  @@index([ownerUserId, status])
   @@map("issues")
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MESSAGES
+// COMMUNICATION — MESSAGES
 // ═══════════════════════════════════════════════════════════════
 
 model Message {
@@ -579,7 +586,7 @@ model Message {
   body         String            @db.Text
   createdAt    DateTime          @default(now()) @map("created_at")
 
-  tradeCase TradeCase? @relation("MessageTradeCase", fields: [tradeCaseId], references: [id])
+  tradeCase TradeCase? @relation("MessageTradeCase", fields: [tradeCaseId], references: [id], onDelete: Cascade)
   rfq       Rfq?       @relation("MessageRfq", fields: [rfqId], references: [id])
   author    User       @relation("MessageAuthor", fields: [authorUserId], references: [id])
 
@@ -587,7 +594,7 @@ model Message {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// NOTIFICATIONS
+// COMMUNICATION — NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════════
 
 model Notification {
@@ -599,6 +606,7 @@ model Notification {
   type            NotificationType
   title           String
   body            String           @db.Text
+  payloadJson     Json?            @map("payload_json")
   readAt          DateTime?        @map("read_at")
   createdAt       DateTime         @default(now()) @map("created_at")
 
@@ -612,7 +620,7 @@ model Notification {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AUDIT EVENTS
+// CONTROL — AUDIT EVENTS
 // ═══════════════════════════════════════════════════════════════
 
 model AuditEvent {
@@ -638,7 +646,7 @@ model AuditEvent {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CLOSEOUT PACK
+// EVIDENCE / COMPLIANCE — CLOSEOUT PACK
 // ═══════════════════════════════════════════════════════════════
 
 model CloseoutPack {
@@ -651,14 +659,14 @@ model CloseoutPack {
   generatedAt       DateTime           @default(now()) @map("generated_at")
   notes             String?            @db.Text
 
-  tradeCase   TradeCase @relation(fields: [tradeCaseId], references: [id])
+  tradeCase   TradeCase @relation(fields: [tradeCaseId], references: [id], onDelete: Cascade)
   generatedBy User      @relation("CloseoutGeneratedBy", fields: [generatedByUserId], references: [id])
 
   @@map("closeout_packs")
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AI RUNS
+// AI / RETRIEVAL — AI RUNS
 // ═══════════════════════════════════════════════════════════════
 
 model AiRun {
@@ -685,3 +693,28 @@ model AiRun {
 
   @@map("ai_runs")
 }
+
+// ═══════════════════════════════════════════════════════════════
+// AI / RETRIEVAL — KNOWLEDGE CHUNK (optional, requires pgvector)
+// ═══════════════════════════════════════════════════════════════
+//
+// Uncomment the model below once pgvector is enabled on the database.
+// You will also need to add the pgvector Prisma extension or use raw SQL
+// for vector similarity queries.
+//
+// model KnowledgeChunk {
+//   id             String   @id @default(cuid())
+//   sourceType     String   @map("source_type")
+//   sourcePath     String   @map("source_path")
+//   title          String?
+//   sectionHeading String?  @map("section_heading")
+//   content        String   @db.Text
+//   contentHash    String   @map("content_hash")
+//   metadataJson   Json?    @map("metadata_json")
+//   createdAt      DateTime @default(now()) @map("created_at")
+//   updatedAt      DateTime @updatedAt @map("updated_at")
+//
+//   // embedding Unsupported("vector(1536)")
+//
+//   @@map("knowledge_chunks")
+// }

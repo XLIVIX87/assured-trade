@@ -1,4 +1,4 @@
-# UK Commodity Gateway — Agent Operating Manual
+# Assured Trade — Agent Operating Manual
 
 ## Project Overview
 Assured Trade Deal Desk: a case-managed platform facilitating commodity trade between UK/EU buyers and Nigerian suppliers. Phase 1 = MVP deal desk (not a marketplace).
@@ -55,7 +55,7 @@ npx prisma validate                               # validate schema
 docker compose up --build          # start all services
 docker compose down                # stop all services
 docker compose down -v             # stop + remove volumes (wipes DB)
-docker compose logs -f web         # tail web logs
+docker compose logs -f assuredtrade-web   # tail web logs
 ```
 
 ---
@@ -98,10 +98,10 @@ docker compose logs -f web         # tail web logs
 - Never run `prisma migrate dev` in production — use `prisma migrate deploy`.
 
 ### Auth & RBAC
-- Auth.js for session management.
+- Auth.js v5 for session management (JWT strategy).
 - Three roles: BUYER, SUPPLIER, OPS.
 - RBAC enforced at API layer (not UI only).
-- Guard utilities: `requireSession()`, `requireRole()`, `requireOrgAccess()`.
+- Guard utilities: `requireAuth()`, `requireSession()`, `requireRole()`, `requireOrgAccess()`.
 - No cross-org data access.
 
 ### AI
@@ -136,7 +136,8 @@ apps/
   web/                    # Next.js application
     app/
       api/                # Route Handlers
-      (dashboard)/        # Buyer/Ops authenticated pages
+      (dashboard)/        # Buyer authenticated pages
+      (ops)/              # Ops authenticated pages
       (supplier)/         # Supplier authenticated pages
       (auth)/             # Login/signup pages
     components/           # App-specific components

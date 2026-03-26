@@ -1,17 +1,20 @@
+name: assured-trade
+
 services:
   db:
     image: postgres:16-alpine
+    container_name: assuredtrade-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ukcg
-      POSTGRES_PASSWORD: ukcg_dev_password
-      POSTGRES_DB: ukcg
+      POSTGRES_USER: assuredtrade
+      POSTGRES_PASSWORD: assuredtrade_dev
+      POSTGRES_DB: assuredtrade
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - assuredtrade-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ukcg"]
+      test: ["CMD-SHELL", "pg_isready -U assuredtrade"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,18 +23,19 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    container_name: assuredtrade-web
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3000"
     environment:
-      DATABASE_URL: postgresql://ukcg:ukcg_dev_password@db:5432/ukcg?schema=public
+      DATABASE_URL: postgresql://assuredtrade:assuredtrade_dev@db:5432/assuredtrade?schema=public
       AUTH_SECRET: dev-secret-change-me-in-production
-      AUTH_URL: http://localhost:3000
-      NEXTAUTH_URL: http://localhost:3000
+      AUTH_URL: http://localhost:3001
+      NEXTAUTH_URL: http://localhost:3001
       NODE_ENV: development
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
-  pgdata:
+  assuredtrade-pgdata:

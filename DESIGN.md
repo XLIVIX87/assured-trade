@@ -1,4 +1,4 @@
-# UK Commodity Gateway — Design System (Phase 1)
+# Assured Trade — Design System (Phase 1)
 
 ## Design Philosophy
 High-trust, financial-grade, operational clarity. Medium-high information density. Phase 1 is **dark mode only** — no light mode.

@@ -1,15 +1,20 @@
+name: assured-trade
+
 services:
   db:
     image: postgres:16-alpine
+    container_name: assuredtrade-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-ukcg}
+      POSTGRES_USER: ${DB_USER:-assuredtrade}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-ukcg}
+      POSTGRES_DB: ${DB_NAME:-assuredtrade}
+    ports:
+      - "127.0.0.1:5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - assuredtrade-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ukcg}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-assuredtrade}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,13 +27,14 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         - NODE_ENV=production
+    container_name: assuredtrade-web
     restart: unless-stopped
     ports:
       - "127.0.0.1:3001:3000"
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-ukcg}:${DB_PASSWORD}@db:5432/${DB_NAME:-ukcg}?schema=public
+      DATABASE_URL: postgresql://${DB_USER:-assuredtrade}:${DB_PASSWORD}@db:5432/${DB_NAME:-assuredtrade}?schema=public
       NODE_ENV: production
     depends_on:
       db:
@@ -37,7 +43,7 @@ services:
       - internal
 
 volumes:
-  pgdata:
+  assuredtrade-pgdata:
 
 networks:
   internal:

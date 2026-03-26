@@ -3,11 +3,15 @@
 // ─────────────────────────────────────────────────────────────
 
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+const DEV_PASSWORD = "password123";
 
 async function main() {
   console.log("Seeding Assured Trade database...");
+  const hashedPassword = await bcrypt.hash(DEV_PASSWORD, 10);
+  console.log(`  Dev login password for all users: ${DEV_PASSWORD}`);
 
   // ───────────────────────────────────────────
   // Organizations
@@ -67,6 +71,7 @@ async function main() {
       name: "Alex Operations",
       email: "alex.ops@assuredtrade.co.uk",
       emailVerified: new Date(),
+      hashedPassword,
       memberships: {
         create: {
           organizationId: opsOrg.id,
@@ -82,6 +87,7 @@ async function main() {
       name: "Sarah Buyer",
       email: "sarah@thamesvalleyfoods.co.uk",
       emailVerified: new Date(),
+      hashedPassword,
       memberships: {
         create: {
           organizationId: buyerOrg.id,
@@ -97,6 +103,7 @@ async function main() {
       name: "Chidi Supplier",
       email: "chidi@lagosagroexports.com",
       emailVerified: new Date(),
+      hashedPassword,
       memberships: {
         create: {
           organizationId: supplierOrg1.id,
@@ -112,6 +119,7 @@ async function main() {
       name: "Amina Supplier",
       email: "amina@kanocommodities.com",
       emailVerified: new Date(),
+      hashedPassword,
       memberships: {
         create: {
           organizationId: supplierOrg2.id,

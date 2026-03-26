@@ -6,9 +6,9 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       target: deps
-    command: sh -c "cd apps/web && npx prisma generate && npx next dev --turbopack"
+    command: sh -c "cd apps/web && npx prisma generate && npx next dev --turbopack --port 3000"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - ./apps/web:/app/apps/web
       - ./packages:/app/packages
@@ -17,3 +17,5 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://assuredtrade:assuredtrade_dev@db:5432/assuredtrade
+      - AUTH_SECRET=dev-secret-change-me-in-production
+      - AUTH_URL=http://localhost:3001
