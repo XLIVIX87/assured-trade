@@ -7,6 +7,7 @@ import { Errors } from '@/lib/api/errors'
 import { logAudit } from '@/lib/audit'
 import { createNotification } from '@/lib/notifications'
 import { rfqCreateSchema } from '@/lib/validation/schemas'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 // GET /api/rfqs — List RFQs
 export const GET = apiHandler(async (req: NextRequest) => {
@@ -59,6 +60,11 @@ export const POST = apiHandler(async (req: NextRequest) => {
 
   if (role !== 'BUYER') {
     throw Errors.forbidden('Only buyers can create RFQs')
+  }
+
+  // Rate limit: 10 RFQs per hour per user
+  if (!checkRateLimit(`rfq-create:${auth.user.id}`, 10, 60 * 60 * 1000)) {
+    throw Errors.rateLimited()
   }
 
   const body = await req.json()

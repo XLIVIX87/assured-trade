@@ -7,6 +7,7 @@ import { Errors } from '@/lib/api/errors'
 import { logAudit } from '@/lib/audit'
 import { createNotification } from '@/lib/notifications'
 import { generateCloseoutZip } from '@/lib/closeout/generate'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -18,6 +19,11 @@ export const POST = apiHandler(async (req: NextRequest, ctx?: RouteContext) => {
 
   if (role !== 'OPS') {
     throw Errors.forbidden('Only Ops can generate close-out packs')
+  }
+
+  // Rate limit: 5 close-out attempts per hour per case
+  if (!checkRateLimit(`closeout:${id}`, 5, 60 * 60 * 1000)) {
+    throw Errors.rateLimited()
   }
 
   const tradeCase = await prisma.tradeCase.findUnique({

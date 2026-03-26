@@ -6,6 +6,7 @@ import { apiSuccess } from '@/lib/api/response'
 import { Errors } from '@/lib/api/errors'
 import { logAudit } from '@/lib/audit'
 import { createNotification } from '@/lib/notifications'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -46,6 +47,11 @@ export const POST = apiHandler(async (req: NextRequest, ctx?: RouteContext) => {
 
   if (role !== 'BUYER') {
     throw Errors.forbidden('Only buyers can accept quotes')
+  }
+
+  // Rate limit: 20 quote acceptances per hour per user
+  if (!checkRateLimit(`quote-accept:${auth.user.id}`, 20, 60 * 60 * 1000)) {
+    throw Errors.rateLimited()
   }
 
   const quote = await prisma.quote.findUnique({

@@ -6,6 +6,7 @@ import { apiSuccess } from '@/lib/api/response'
 import { Errors } from '@/lib/api/errors'
 import { logAudit } from '@/lib/audit'
 import { documentUploadSchema } from '@/lib/validation/schemas'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -70,6 +71,11 @@ export const POST = apiHandler(async (req: NextRequest, ctx?: RouteContext) => {
 
   if (role === 'BUYER') {
     throw Errors.forbidden('Buyers cannot upload documents')
+  }
+
+  // Rate limit: 30 document uploads per hour per user
+  if (!checkRateLimit(`doc-upload:${auth.user.id}`, 30, 60 * 60 * 1000)) {
+    throw Errors.rateLimited()
   }
 
   const tradeCase = await prisma.tradeCase.findUnique({
