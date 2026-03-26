@@ -13,7 +13,7 @@ interface NavItem {
 
 const navByRole: Record<Role, NavItem[]> = {
   buyer: [
-    { label: "Dashboard", href: "/rfqs", icon: "dashboard" },
+    { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
     { label: "RFQs", href: "/rfqs", icon: "request_quote" },
     { label: "Quotes", href: "/quotes", icon: "receipt_long" },
     { label: "Trade Cases", href: "/cases", icon: "handshake" },

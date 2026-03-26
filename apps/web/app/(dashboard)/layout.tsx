@@ -28,7 +28,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-surface-dim">
       <Sidebar role={role} activePath="" />
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="ml-64 flex-1 flex flex-col min-h-screen">
         <TopNav
           userName={user.name ?? "User"}
           userRole={roleLabelMap[role] ?? role}

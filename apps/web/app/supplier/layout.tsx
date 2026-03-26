@@ -16,7 +16,7 @@ export default async function SupplierLayout({
   return (
     <div className="flex min-h-screen bg-surface-dim">
       <Sidebar role="supplier" activePath="" />
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="ml-64 flex-1 flex flex-col min-h-screen">
         <TopNav userName={user.name ?? "Supplier"} userRole="Supplier Desk" />
         <main className="mt-16 flex-1 overflow-y-auto">{children}</main>
       </div>
