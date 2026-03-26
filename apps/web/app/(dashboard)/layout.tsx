@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { TopNav } from "@/components/layout/TopNav";
 
 export default async function DashboardLayout({
   children,
@@ -10,20 +11,32 @@ export default async function DashboardLayout({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  // Map the membership role to the Sidebar's expected role type.
-  // Default to "buyer" for the (dashboard) route group.
   const roleMap: Record<string, "buyer" | "supplier" | "ops"> = {
     BUYER: "buyer",
     SUPPLIER: "supplier",
     OPS: "ops",
   };
 
-  const role = roleMap[session.user.role ?? ""] ?? "buyer";
+  const user = session.user as { name?: string | null; role?: string; orgId?: string };
+  const role = roleMap[user.role ?? ""] ?? "buyer";
+  const roleLabelMap: Record<string, string> = {
+    buyer: "Lead Buyer",
+    ops: "Senior Ops Officer",
+    supplier: "Supplier Desk",
+  };
 
   return (
-    <div className="flex min-h-screen bg-bg-base">
-      <Sidebar role={role} />
-      <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
+    <div className="flex min-h-screen bg-surface-dim">
+      <Sidebar role={role} activePath="" />
+      <div className="flex-1 flex flex-col min-h-screen">
+        <TopNav
+          userName={user.name ?? "User"}
+          userRole={roleLabelMap[role] ?? role}
+        />
+        <main className="mt-16 flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

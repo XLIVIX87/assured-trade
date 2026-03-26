@@ -1,86 +1,76 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  FileText,
-  MessageSquareQuote,
-  Briefcase,
-  ShieldCheck,
-  Users,
-  Settings,
-  type LucideIcon,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Logo } from "./Logo";
+import { signOut } from "next-auth/react";
+
+type Role = "buyer" | "supplier" | "ops";
 
 interface NavItem {
   label: string;
   href: string;
-  icon: LucideIcon;
+  icon: string;
 }
-
-type Role = "buyer" | "supplier" | "ops";
 
 const navByRole: Record<Role, NavItem[]> = {
   buyer: [
-    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { label: "RFQs", href: "/dashboard/rfqs", icon: FileText },
-    { label: "Quotes", href: "/dashboard/quotes", icon: MessageSquareQuote },
-    { label: "Trade Cases", href: "/dashboard/cases", icon: Briefcase },
-  ],
-  supplier: [
-    { label: "Dashboard", href: "/supplier/dashboard", icon: LayoutDashboard },
-    { label: "Trade Cases", href: "/supplier/cases", icon: Briefcase },
+    { label: "Dashboard", href: "/rfqs", icon: "dashboard" },
+    { label: "RFQs", href: "/rfqs", icon: "request_quote" },
+    { label: "Quotes", href: "/quotes", icon: "receipt_long" },
+    { label: "Trade Cases", href: "/cases", icon: "handshake" },
+    { label: "Documents", href: "/documents", icon: "description" },
   ],
   ops: [
-    { label: "Dashboard", href: "/ops/dashboard", icon: LayoutDashboard },
-    { label: "RFQ Queue", href: "/ops/rfqs", icon: FileText },
-    { label: "Verification", href: "/ops/verification", icon: ShieldCheck },
-    { label: "All Cases", href: "/ops/cases", icon: Briefcase },
-    { label: "Admin", href: "/ops/admin", icon: Users },
+    { label: "Dashboard", href: "/ops/dashboard", icon: "dashboard" },
+    { label: "RFQs", href: "/ops/rfqs", icon: "request_quote" },
+    { label: "Quotes", href: "/ops/quotes", icon: "receipt_long" },
+    { label: "Trade Cases", href: "/ops/cases", icon: "handshake" },
+    { label: "Documents", href: "/ops/documents", icon: "description" },
+    { label: "Ops Queue", href: "/ops/queue", icon: "rule_folder" },
+  ],
+  supplier: [
+    { label: "Dashboard", href: "/supplier/dashboard", icon: "dashboard" },
+    { label: "Trade Cases", href: "/supplier/cases", icon: "handshake" },
+    { label: "Documents", href: "/supplier/documents", icon: "description" },
   ],
 };
 
 interface SidebarProps {
   role: Role;
+  activePath: string;
 }
 
-export function Sidebar({ role }: SidebarProps) {
-  const pathname = usePathname();
+export function Sidebar({ role, activePath }: SidebarProps) {
   const items = navByRole[role];
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-border bg-surface-1">
-      {/* Logo */}
-      <div className="flex h-16 items-center px-5 border-b border-border">
-        <Logo />
+    <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col bg-surface-container-lowest">
+      {/* Header */}
+      <div className="px-6 py-6">
+        <h1 className="text-lg font-bold text-white">Assured Trade</h1>
+        <p className="mt-0.5 text-[10px] uppercase tracking-widest text-slate-500">
+          Deal Desk v1.0
+        </p>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="flex flex-col gap-1">
+      <nav className="flex-1 overflow-y-auto px-3 py-2">
+        <ul className="flex flex-col gap-0.5">
           {items.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" &&
-                item.href !== "/supplier/dashboard" &&
-                item.href !== "/ops/dashboard" &&
-                pathname.startsWith(item.href));
+            const isActive = activePath === item.href;
 
             return (
-              <li key={item.href}>
+              <li key={item.label}>
                 <Link
                   href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  className={`flex items-center gap-3 rounded-md px-3 py-2.5 font-headline text-[12px] uppercase tracking-widest transition-colors ${
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"
-                  )}
+                      ? "border-r-2 border-blue-400 bg-white/5 text-blue-400"
+                      : "text-slate-500 hover:bg-white/5 hover:text-white"
+                  }`}
                 >
-                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="material-symbols-outlined text-[20px]">
+                    {item.icon}
+                  </span>
                   {item.label}
                 </Link>
               </li>
@@ -90,14 +80,23 @@ export function Sidebar({ role }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-border px-3 py-3">
+      <div className="border-t border-white/5 px-3 py-3">
         <Link
-          href="#"
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-text-tertiary transition-colors hover:bg-surface-2 hover:text-text-primary"
+          href="/support"
+          className="flex items-center gap-3 rounded-md px-3 py-2.5 font-headline text-[12px] uppercase tracking-widest text-slate-500 transition-colors hover:bg-white/5 hover:text-white"
         >
-          <Settings className="h-4 w-4" />
-          Settings
+          <span className="material-symbols-outlined text-[20px]">
+            help_outline
+          </span>
+          Support
         </Link>
+        <button
+          onClick={() => signOut()}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 font-headline text-[12px] uppercase tracking-widest text-slate-500 transition-colors hover:bg-white/5 hover:text-white"
+        >
+          <span className="material-symbols-outlined text-[20px]">logout</span>
+          Sign Out
+        </button>
       </div>
     </aside>
   );
