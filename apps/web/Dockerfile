@@ -5,19 +5,17 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy root workspace files
+# Copy all package files for workspace resolution
 COPY package.json package-lock.json* ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/ui/package.json ./packages/ui/
 
-RUN npm ci --workspace=apps/web --workspace=packages/ui --include-workspace-root
+RUN npm ci
 
 # Build the app
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=deps /app/packages/ui/node_modules ./packages/ui/node_modules 2>/dev/null || true
 COPY . .
 
 # Generate Prisma client
