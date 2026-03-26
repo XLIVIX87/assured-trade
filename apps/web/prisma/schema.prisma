@@ -1,0 +1,687 @@
+// ─────────────────────────────────────────────────────────────
+// Assured Trade — Phase 1 Prisma Schema
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════
+
+enum MembershipRole {
+  BUYER
+  SUPPLIER
+  OPS
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum OrgVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum OrgVerificationLevel {
+  NONE
+  BASIC
+  ENHANCED
+}
+
+enum RfqStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  QUOTED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum TradeCaseStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum MilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  OVERDUE
+}
+
+enum DocumentStatus {
+  REQUIRED
+  UPLOADED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum DocumentType {
+  COO
+  COA
+  PHYTO
+  PACKING_LIST
+  BILL_OF_LADING
+  FUMIGATION_CERT
+  WEIGHT_CERT
+  QUALITY_CERT
+  INSURANCE_CERT
+  COMMERCIAL_INVOICE
+  OTHER
+}
+
+enum ReviewAction {
+  APPROVED
+  REJECTED
+}
+
+enum InspectionResult {
+  PASS
+  FAIL
+  INCONCLUSIVE
+}
+
+enum IssueType {
+  DOCUMENT
+  QUALITY
+  LOGISTICS
+  COMPLIANCE
+  OTHER
+}
+
+enum IssueSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum MessageVisibility {
+  INTERNAL
+  SHARED
+}
+
+enum NotificationType {
+  RFQ_SUBMITTED
+  QUOTE_SENT
+  QUOTE_ACCEPTED
+  DOCUMENT_UPLOADED
+  DOCUMENT_APPROVED
+  DOCUMENT_REJECTED
+  INSPECTION_RECORDED
+  MILESTONE_UPDATED
+  MILESTONE_OVERDUE
+  ISSUE_CREATED
+  CLOSEOUT_READY
+  GENERAL
+}
+
+enum CloseoutPackStatus {
+  GENERATING
+  READY
+  FAILED
+}
+
+enum AiRunStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  TIMEOUT
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH.JS ADAPTER MODELS
+// ═══════════════════════════════════════════════════════════════
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CORE MODELS
+// ═══════════════════════════════════════════════════════════════
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Auth.js relations
+  accounts Account[]
+  sessions Session[]
+
+  // App relations
+  memberships        Membership[]
+  createdRfqs        Rfq[]             @relation("RfqCreatedBy")
+  createdQuotes      Quote[]           @relation("QuoteCreatedBy")
+  assignedTradeCases TradeCase[]       @relation("TradeCaseAssignedOps")
+  createdLots        Lot[]             @relation("LotCreatedBy")
+  ownedMilestones    Milestone[]       @relation("MilestoneOwner")
+  uploadedDocuments  Document[]        @relation("DocumentUploadedBy")
+  documentReviews    DocumentReview[]  @relation("DocumentReviewedBy")
+  createdInspections Inspection[]      @relation("InspectionCreatedBy")
+  ownedIssues        Issue[]           @relation("IssueOwner")
+  createdIssues      Issue[]           @relation("IssueCreatedBy")
+  authoredMessages   Message[]         @relation("MessageAuthor")
+  notifications      Notification[]    @relation("NotificationRecipient")
+  auditEvents        AuditEvent[]      @relation("AuditEventActor")
+  generatedCloseouts CloseoutPack[]    @relation("CloseoutGeneratedBy")
+  aiRuns             AiRun[]           @relation("AiRunUser")
+
+  @@map("users")
+}
+
+model Organization {
+  id                 String                @id @default(cuid())
+  name               String
+  slug               String                @unique
+  country            String
+  registrationNumber String?               @map("registration_number")
+  type               String
+  verificationStatus OrgVerificationStatus @default(UNVERIFIED) @map("verification_status")
+  verificationLevel  OrgVerificationLevel  @default(NONE) @map("verification_level")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  memberships        Membership[]
+  rfqs               Rfq[]            @relation("RfqBuyerOrg")
+  lots               Lot[]            @relation("LotSupplierOrg")
+  lotAllocations     LotAllocation[]  @relation("LotAllocationSupplierOrg")
+  buyerTradeCases    TradeCase[]      @relation("TradeCaseBuyerOrg")
+  uploadedDocuments  Document[]       @relation("DocumentUploadedByOrg")
+  notifications      Notification[]   @relation("NotificationOrg")
+  auditEvents        AuditEvent[]     @relation("AuditEventActorOrg")
+  aiRuns             AiRun[]          @relation("AiRunOrg")
+
+  @@map("organizations")
+}
+
+model Membership {
+  id             String           @id @default(cuid())
+  userId         String           @map("user_id")
+  organizationId String           @map("organization_id")
+  role           MembershipRole
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId, status])
+  @@map("memberships")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RFQ & QUOTING
+// ═══════════════════════════════════════════════════════════════
+
+model Rfq {
+  id                   String    @id @default(cuid())
+  buyerOrganizationId  String    @map("buyer_organization_id")
+  createdByUserId      String    @map("created_by_user_id")
+  status               RfqStatus @default(DRAFT)
+  commodity            String
+  volume               Float
+  unit                 String
+  destination          String
+  incoterm             String?
+  timeline             String?
+  notes                String?   @db.Text
+  aiSummary            String?   @map("ai_summary") @db.Text
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  buyerOrganization Organization    @relation("RfqBuyerOrg", fields: [buyerOrganizationId], references: [id])
+  createdBy         User            @relation("RfqCreatedBy", fields: [createdByUserId], references: [id])
+  attachments       RfqAttachment[]
+  quotes            Quote[]
+  tradeCases        TradeCase[]
+  messages          Message[]       @relation("MessageRfq")
+  notifications     Notification[]  @relation("NotificationRfq")
+  aiRuns            AiRun[]         @relation("AiRunRfq")
+
+  @@index([buyerOrganizationId, status, createdAt])
+  @@map("rfqs")
+}
+
+model RfqAttachment {
+  id               String   @id @default(cuid())
+  rfqId            String   @map("rfq_id")
+  fileKey          String   @map("file_key")
+  originalName     String   @map("original_name")
+  mimeType         String   @map("mime_type")
+  sizeBytes        Int      @map("size_bytes")
+  uploadedByUserId String   @map("uploaded_by_user_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  rfq Rfq @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+
+  @@map("rfq_attachments")
+}
+
+model Quote {
+  id                     String      @id @default(cuid())
+  rfqId                  String      @map("rfq_id")
+  createdByUserId        String      @map("created_by_user_id")
+  status                 QuoteStatus @default(DRAFT)
+  currency               String      @default("GBP")
+  serviceFeeAmount       Float       @map("service_fee_amount")
+  brokerCommissionAmount Float?      @map("broker_commission_amount")
+  leadTimeDays           Int         @map("lead_time_days")
+  qcPlan                 String      @map("qc_plan") @db.Text
+  docPlan                String      @map("doc_plan") @db.Text
+  terms                  String      @db.Text
+  expiresAt              DateTime    @map("expires_at")
+  acceptedAt             DateTime?   @map("accepted_at")
+  createdAt              DateTime    @default(now()) @map("created_at")
+  updatedAt              DateTime    @updatedAt @map("updated_at")
+
+  rfq       Rfq        @relation(fields: [rfqId], references: [id])
+  createdBy User       @relation("QuoteCreatedBy", fields: [createdByUserId], references: [id])
+  tradeCase TradeCase? @relation("TradeCaseQuote")
+
+  @@index([rfqId, createdAt])
+  @@index([status, expiresAt])
+  @@map("quotes")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRADE CASE
+// ═══════════════════════════════════════════════════════════════
+
+model TradeCase {
+  id                  String          @id @default(cuid())
+  quoteId             String          @unique @map("quote_id")
+  rfqId               String          @map("rfq_id")
+  buyerOrganizationId String          @map("buyer_organization_id")
+  assignedOpsUserId   String?         @map("assigned_ops_user_id")
+  status              TradeCaseStatus @default(ACTIVE)
+  referenceCode       String          @unique @map("reference_code")
+  commodity           String
+  routeSummary        String?         @map("route_summary")
+  expectedShipDate    DateTime?       @map("expected_ship_date")
+  completedAt         DateTime?       @map("completed_at")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  quote             Quote          @relation("TradeCaseQuote", fields: [quoteId], references: [id])
+  rfq               Rfq            @relation(fields: [rfqId], references: [id])
+  buyerOrganization Organization   @relation("TradeCaseBuyerOrg", fields: [buyerOrganizationId], references: [id])
+  assignedOps       User?          @relation("TradeCaseAssignedOps", fields: [assignedOpsUserId], references: [id])
+  lotAllocations    LotAllocation[]
+  milestones        Milestone[]
+  documents         Document[]
+  inspections       Inspection[]
+  issues            Issue[]
+  messages          Message[]      @relation("MessageTradeCase")
+  notifications     Notification[] @relation("NotificationTradeCase")
+  auditEvents       AuditEvent[]   @relation("AuditEventTradeCase")
+  closeoutPacks     CloseoutPack[]
+  aiRuns            AiRun[]        @relation("AiRunTradeCase")
+
+  @@index([buyerOrganizationId, status, createdAt])
+  @@index([assignedOpsUserId, status])
+  @@map("trade_cases")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOTS & ALLOCATIONS
+// ═══════════════════════════════════════════════════════════════
+
+model Lot {
+  id                     String   @id @default(cuid())
+  supplierOrganizationId String   @map("supplier_organization_id")
+  createdByUserId        String   @map("created_by_user_id")
+  commodity              String
+  origin                 String
+  grade                  String?
+  batchNumber            String?  @map("batch_number")
+  availableQuantity      Float    @map("available_quantity")
+  unit                   String
+  storageNotes           String?  @map("storage_notes") @db.Text
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  supplierOrganization Organization    @relation("LotSupplierOrg", fields: [supplierOrganizationId], references: [id])
+  createdBy            User            @relation("LotCreatedBy", fields: [createdByUserId], references: [id])
+  allocations          LotAllocation[]
+  inspections          Inspection[]
+
+  @@index([supplierOrganizationId, commodity, createdAt])
+  @@map("lots")
+}
+
+model LotAllocation {
+  id                     String   @id @default(cuid())
+  tradeCaseId            String   @map("trade_case_id")
+  lotId                  String   @map("lot_id")
+  supplierOrganizationId String   @map("supplier_organization_id")
+  quantityAllocated      Float    @map("quantity_allocated")
+  unit                   String
+  notes                  String?  @db.Text
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  tradeCase            TradeCase    @relation(fields: [tradeCaseId], references: [id])
+  lot                  Lot          @relation(fields: [lotId], references: [id])
+  supplierOrganization Organization @relation("LotAllocationSupplierOrg", fields: [supplierOrganizationId], references: [id])
+
+  @@unique([tradeCaseId, lotId])
+  @@map("lot_allocations")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MILESTONES
+// ═══════════════════════════════════════════════════════════════
+
+model Milestone {
+  id            String          @id @default(cuid())
+  tradeCaseId   String          @map("trade_case_id")
+  templateKey   String?         @map("template_key")
+  name          String
+  sequence      Int
+  status        MilestoneStatus @default(NOT_STARTED)
+  ownerUserId   String?         @map("owner_user_id")
+  dueDate       DateTime?       @map("due_date")
+  completedAt   DateTime?       @map("completed_at")
+  blockedReason String?         @map("blocked_reason") @db.Text
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id])
+  owner     User?     @relation("MilestoneOwner", fields: [ownerUserId], references: [id])
+
+  @@unique([tradeCaseId, sequence])
+  @@index([status, dueDate])
+  @@map("milestones")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DOCUMENTS & REVIEWS
+// ═══════════════════════════════════════════════════════════════
+
+model Document {
+  id                       String         @id @default(cuid())
+  tradeCaseId              String         @map("trade_case_id")
+  documentType             DocumentType   @map("document_type")
+  status                   DocumentStatus @default(REQUIRED)
+  required                 Boolean        @default(true)
+  fileKey                  String?        @map("file_key")
+  originalName             String?        @map("original_name")
+  mimeType                 String?        @map("mime_type")
+  sizeBytes                Int?           @map("size_bytes")
+  issuedBy                 String?        @map("issued_by")
+  issuedAt                 DateTime?      @map("issued_at")
+  uploadedByUserId         String?        @map("uploaded_by_user_id")
+  uploadedByOrganizationId String?        @map("uploaded_by_organization_id")
+  createdAt                DateTime       @default(now()) @map("created_at")
+  updatedAt                DateTime       @updatedAt @map("updated_at")
+
+  tradeCase              TradeCase        @relation(fields: [tradeCaseId], references: [id])
+  uploadedBy             User?            @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id])
+  uploadedByOrganization Organization?    @relation("DocumentUploadedByOrg", fields: [uploadedByOrganizationId], references: [id])
+  reviews                DocumentReview[]
+
+  @@index([tradeCaseId, documentType, status])
+  @@index([status, updatedAt])
+  @@map("documents")
+}
+
+model DocumentReview {
+  id               String       @id @default(cuid())
+  documentId       String       @map("document_id")
+  reviewedByUserId String       @map("reviewed_by_user_id")
+  action           ReviewAction
+  reason           String?      @db.Text
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  reviewedBy User     @relation("DocumentReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@index([documentId, createdAt])
+  @@map("document_reviews")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INSPECTIONS
+// ═══════════════════════════════════════════════════════════════
+
+model Inspection {
+  id              String           @id @default(cuid())
+  tradeCaseId     String           @map("trade_case_id")
+  lotId           String?          @map("lot_id")
+  provider        String
+  scheduledAt     DateTime?        @map("scheduled_at")
+  completedAt     DateTime?        @map("completed_at")
+  result          InspectionResult
+  notes           String?          @db.Text
+  attachmentsJson Json?            @map("attachments_json")
+  createdByUserId String           @map("created_by_user_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id])
+  lot       Lot?      @relation(fields: [lotId], references: [id])
+  createdBy User      @relation("InspectionCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([tradeCaseId, completedAt])
+  @@map("inspections")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ISSUES
+// ═══════════════════════════════════════════════════════════════
+
+model Issue {
+  id              String        @id @default(cuid())
+  tradeCaseId     String        @map("trade_case_id")
+  type            IssueType
+  severity        IssueSeverity
+  status          IssueStatus   @default(OPEN)
+  description     String        @db.Text
+  resolutionNotes String?       @map("resolution_notes") @db.Text
+  ownerUserId     String?       @map("owner_user_id")
+  createdByUserId String        @map("created_by_user_id")
+  resolvedAt      DateTime?     @map("resolved_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  tradeCase TradeCase @relation(fields: [tradeCaseId], references: [id])
+  owner     User?     @relation("IssueOwner", fields: [ownerUserId], references: [id])
+  createdBy User      @relation("IssueCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([tradeCaseId, status, createdAt])
+  @@map("issues")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MESSAGES
+// ═══════════════════════════════════════════════════════════════
+
+model Message {
+  id           String            @id @default(cuid())
+  tradeCaseId  String?           @map("trade_case_id")
+  rfqId        String?           @map("rfq_id")
+  authorUserId String            @map("author_user_id")
+  visibility   MessageVisibility @default(SHARED)
+  body         String            @db.Text
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  tradeCase TradeCase? @relation("MessageTradeCase", fields: [tradeCaseId], references: [id])
+  rfq       Rfq?       @relation("MessageRfq", fields: [rfqId], references: [id])
+  author    User       @relation("MessageAuthor", fields: [authorUserId], references: [id])
+
+  @@map("messages")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+
+model Notification {
+  id              String           @id @default(cuid())
+  recipientUserId String           @map("recipient_user_id")
+  organizationId  String?          @map("organization_id")
+  tradeCaseId     String?          @map("trade_case_id")
+  rfqId           String?          @map("rfq_id")
+  type            NotificationType
+  title           String
+  body            String           @db.Text
+  readAt          DateTime?        @map("read_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  recipient    User          @relation("NotificationRecipient", fields: [recipientUserId], references: [id])
+  organization Organization? @relation("NotificationOrg", fields: [organizationId], references: [id])
+  tradeCase    TradeCase?    @relation("NotificationTradeCase", fields: [tradeCaseId], references: [id])
+  rfq          Rfq?          @relation("NotificationRfq", fields: [rfqId], references: [id])
+
+  @@index([recipientUserId, readAt, createdAt])
+  @@map("notifications")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUDIT EVENTS
+// ═══════════════════════════════════════════════════════════════
+
+model AuditEvent {
+  id                  String   @id @default(cuid())
+  actorUserId         String?  @map("actor_user_id")
+  actorOrganizationId String?  @map("actor_organization_id")
+  entityType          String   @map("entity_type")
+  entityId            String   @map("entity_id")
+  action              String
+  beforeJson          Json?    @map("before_json")
+  afterJson           Json?    @map("after_json")
+  tradeCaseId         String?  @map("trade_case_id")
+  requestId           String?  @map("request_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  actorUser         User?         @relation("AuditEventActor", fields: [actorUserId], references: [id])
+  actorOrganization Organization? @relation("AuditEventActorOrg", fields: [actorOrganizationId], references: [id])
+  tradeCase         TradeCase?    @relation("AuditEventTradeCase", fields: [tradeCaseId], references: [id])
+
+  @@index([entityType, entityId, createdAt])
+  @@index([tradeCaseId, createdAt])
+  @@map("audit_events")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLOSEOUT PACK
+// ═══════════════════════════════════════════════════════════════
+
+model CloseoutPack {
+  id                String             @id @default(cuid())
+  tradeCaseId       String             @map("trade_case_id")
+  status            CloseoutPackStatus @default(GENERATING)
+  fileKey           String?            @map("file_key")
+  summaryFileKey    String?            @map("summary_file_key")
+  generatedByUserId String             @map("generated_by_user_id")
+  generatedAt       DateTime           @default(now()) @map("generated_at")
+  notes             String?            @db.Text
+
+  tradeCase   TradeCase @relation(fields: [tradeCaseId], references: [id])
+  generatedBy User      @relation("CloseoutGeneratedBy", fields: [generatedByUserId], references: [id])
+
+  @@map("closeout_packs")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI RUNS
+// ═══════════════════════════════════════════════════════════════
+
+model AiRun {
+  id             String      @id @default(cuid())
+  feature        String
+  userId         String      @map("user_id")
+  organizationId String?     @map("organization_id")
+  tradeCaseId    String?     @map("trade_case_id")
+  rfqId          String?     @map("rfq_id")
+  provider       String
+  model          String
+  inputTokens    Int?        @map("input_tokens")
+  outputTokens   Int?        @map("output_tokens")
+  latencyMs      Int?        @map("latency_ms")
+  costEstimate   Float?      @map("cost_estimate")
+  status         AiRunStatus @default(PENDING)
+  errorType      String?     @map("error_type")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  user         User          @relation("AiRunUser", fields: [userId], references: [id])
+  organization Organization? @relation("AiRunOrg", fields: [organizationId], references: [id])
+  tradeCase    TradeCase?    @relation("AiRunTradeCase", fields: [tradeCaseId], references: [id])
+  rfq          Rfq?          @relation("AiRunRfq", fields: [rfqId], references: [id])
+
+  @@map("ai_runs")
+}

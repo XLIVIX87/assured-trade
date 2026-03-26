@@ -1,0 +1,14 @@
+http:
+  routers:
+    assuredtrade:
+      rule: "Host(`assuredtrade.srv1528810.hstgr.cloud`)"
+      entryPoints:
+        - websecure
+      service: assuredtrade
+      tls:
+        certResolver: letsencrypt
+  services:
+    assuredtrade:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:3001"

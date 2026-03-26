@@ -1,0 +1,65 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build output
+.next
+**/.next
+out
+dist
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Documentation
+docs/
+*.md
+!apps/web/README.md
+
+# Tests
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+coverage
+playwright-report
+test-results
+
+# CI/CD
+.github
+
+# Deploy
+deploy/
+
+# Turborepo
+.turbo
+
+# Prisma migrations are needed — do NOT ignore prisma/
+
+# Misc
+*.log
+npm-debug.log*
+.npm
+.cache

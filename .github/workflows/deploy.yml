@@ -1,0 +1,59 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI Check
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to VPS
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 72.62.133.36
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+
+            APP_DIR="/opt/AssuredTrade"
+            cd "$APP_DIR"
+
+            echo "Pulling latest changes..."
+            git pull origin main
+
+            echo "Building and starting services..."
+            docker compose -f docker-compose.prod.yml up -d --build
+
+            echo "Waiting for database to be ready..."
+            sleep 10
+
+            echo "Running database migrations..."
+            docker compose -f docker-compose.prod.yml exec -T web npx prisma migrate deploy
+
+            echo "Running health check..."
+            for i in $(seq 1 12); do
+              if curl -sf http://127.0.0.1:3001/api/health > /dev/null 2>&1; then
+                echo "Health check passed!"
+                exit 0
+              fi
+              echo "Waiting for app to start... (attempt $i/12)"
+              sleep 5
+            done
+
+            echo "Health check failed after 60 seconds"
+            docker compose -f docker-compose.prod.yml logs --tail=50 web
+            exit 1

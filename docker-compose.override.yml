@@ -1,0 +1,19 @@
+# Development overrides — automatically applied by `docker compose up`
+# Uses next dev with hot reload instead of production build
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: deps
+    command: sh -c "cd apps/web && npx prisma generate && npx next dev --turbopack"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages:/app/packages
+      - /app/apps/web/node_modules
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://assuredtrade:assuredtrade_dev@db:5432/assuredtrade
